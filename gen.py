@@ -70,7 +70,7 @@ def model_discriminator_cifar():
     # M: (Or 32x32 for debugging)
     input_shape = dim_ordering_shape((3, 32, 32))
     c1 = Convolution2D(int(nch / 4), h, h, border_mode='same', W_regularizer=reg(),
-                       input_shape=input_shape)
+                       input_shape=dim_ordering_shape((32, 32, 3)))
     print "c1..."
     c2 = Convolution2D(int(nch / 2), h, h, border_mode='same', W_regularizer=reg())
     print "c2..."
@@ -95,40 +95,7 @@ def model_discriminator_cifar():
     model.add(Activation('sigmoid'))
     return model
 
-# These models are from the example_gan.py file from keras-adversarial
-# I'm not sure what they're supposed to be good for
-def model_generator(latent_dim, input_shape, hidden_dim=1024, reg=lambda: l1l2(1e-5, 1e-5)):
-    return Sequential([
-        Dense(int(hidden_dim / 4), name="generator_h1", input_dim=latent_dim, W_regularizer=reg()),
-        LeakyReLU(0.2),
-        Dense(int(hidden_dim / 2), name="generator_h2", W_regularizer=reg()),
-        LeakyReLU(0.2),
-        Dense(hidden_dim, name="generator_h3", W_regularizer=reg()),
-        LeakyReLU(0.2),
-        Dense(np.prod(input_shape), name="generator_x_flat", W_regularizer=reg()),
-        Activation('sigmoid'),
-        Reshape(input_shape, name="generator_x")],
-        name="generator")
-
-
-def model_discriminator(input_shape, hidden_dim=1024, reg=lambda: l1l2(1e-5, 1e-5), output_activation="sigmoid"):
-    return Sequential([
-        Flatten(name="discriminator_flatten", input_shape=input_shape),
-        Dense(hidden_dim, name="discriminator_h1", W_regularizer=reg()),
-        LeakyReLU(0.2),
-        Dense(int(hidden_dim / 2), name="discriminator_h2", W_regularizer=reg()),
-        LeakyReLU(0.2),
-        Dense(int(hidden_dim / 4), name="discriminator_h3", W_regularizer=reg()),
-        LeakyReLU(0.2),
-        Dense(1, name="discriminator_y", W_regularizer=reg()),
-        Activation(output_activation)],
-        name="discriminator")
-
 def main():
-    # to stop potential randomness
-    seed = 128
-    rng = np.random.RandomState(seed)    
-
     # set path
     root_dir = os.path.abspath('.')
     data_dir = os.path.join(root_dir, 'MData')
@@ -145,72 +112,21 @@ def main():
         temp.append(img)
         
     train_x = np.stack(temp)
-
     train_x = train_x / 255
-            
-    # print image
-    img_name = rng.choice(train.filename)
-    filepath = os.path.join(data_dir, 'Train', 'Images', 'train', img_name)
 
-    img = imread(filepath, flatten=True)
-    
-    # Levers 
-    g_input_shape = 100 
-
-    # M: This should be changed to match the dimensions of the input images
-    d_input_shape = (256, 256) 
-
-    hidden_1_num_units = 500 
-    hidden_2_num_units = 500 
-    # g_output_num_units = 784 
-
-    # M: THis may need to adjusted for color/res differences
-    g_output_num_units = 256*256 
-
-    d_output_num_units = 1 
     epochs = 1 
     batch_size = 128    
 
-    # model_1 = model_generator(g_input_shape, d_input_shape)
-    # model_2 = model_discriminator(d_input_shape)
-
     model_1 = model_generator_cifar()
-    print "Initialized generator"
     model_2 = model_discriminator_cifar()
-    print "Initialized discriminator"
 
-    '''
-    # generator
-    # These are the models that this tutorial originally used to classify digits
-    model_1 = Sequential([
-        Dense(units=hidden_1_num_units, input_dim=g_input_shape, activation='relu', kernel_regularizer=L1L2(1e-5, 1e-5)),
+    # gan = simple_gan(model_1, model_2, normal_latent_sampling((100,)))
+    latent_dim = 100
+    gan = simple_gan(model_1, model_2, latent_sampling=normal_latent_sampling((latent_dim,)))
 
-        Dense(units=hidden_2_num_units, activation='relu', kernel_regularizer=L1L2(1e-5, 1e-5)),
-            
-        Dense(units=g_output_num_units, activation='sigmoid', kernel_regularizer=L1L2(1e-5, 1e-5)),
-        
-        Reshape(d_input_shape),
-    ])
-
-    # discriminator
-    model_2 = Sequential([
-        InputLayer(input_shape=d_input_shape),
-        
-        Flatten(),
-            
-        Dense(units=hidden_1_num_units, activation='relu', kernel_regularizer=L1L2(1e-5, 1e-5)),
-
-        Dense(units=hidden_2_num_units, activation='relu', kernel_regularizer=L1L2(1e-5, 1e-5)),
-            
-        Dense(units=d_output_num_units, activation='sigmoid', kernel_regularizer=L1L2(1e-5, 1e-5)),
-    ])
-    '''
-    gan = simple_gan(model_1, model_2, normal_latent_sampling((100,)))
     model = AdversarialModel(base_model=gan,player_params=[model_1.trainable_weights, model_2.trainable_weights])
-    print "Initialized AdversarialModel"
     model.adversarial_compile(adversarial_optimizer=AdversarialOptimizerSimultaneous(), player_optimizers=['adam', 'adam'], loss='binary_crossentropy')
-    print "Compiled AdversarialModel"
-
+    
     history = model.fit(x=train_x, y=gan_targets(train_x.shape[0]), epochs=epochs, batch_size=batch_size)    
     zsamples = np.random.normal(size=(10, 100))
     pred = model_1.predict(zsamples)
