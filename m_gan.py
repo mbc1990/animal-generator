@@ -88,19 +88,16 @@ def main():
         
     train_x = np.stack(temp)
     train_x = train_x / 255
-
-    history = model.fit(x=train_x, y=gan_targets(train_x.shape[0]), epochs=epochs, batch_size=batch_size)    
+    
+    # Side effects
+    model.fit(x=train_x, y=gan_targets(train_x.shape[0]), epochs=epochs, batch_size=batch_size)    
     
     # TODO: Investigate if this is the source of all-white image output
-    zsamples = np.random.normal(size=(10*10, latent_dim))
-    
-    '''
-    def generator_sampler():
-        return generator.predict(zsamples).reshape((10, 10, IMAGE_DIM, IMAGE_DIM))
-    '''
-    # pred = generator.predict(zsamples)
-    pred = generator.predict(zsamples).reshape((10, 10, IMAGE_DIM, IMAGE_DIM))
+    zsamples = np.random.normal(size=(10, latent_dim))
+    # pred = generator.predict(zsamples).reshape((10, 10, IMAGE_DIM, IMAGE_DIM))
+    pred = generator.predict(zsamples)
     for i in range(pred.shape[0]):
+        plt.imshow(pred[i, :])
         plt.savefig(out_dir+str(i)+'.png')
 
 if __name__ == "__main__":
