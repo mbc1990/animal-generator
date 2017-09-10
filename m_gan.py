@@ -1,18 +1,19 @@
 import os
 
-from keras.layers import Reshape, InputLayer, Flatten, LeakyReLU, Activation
+from keras.layers import Reshape, InputLayer, Flatten, LeakyReLU, Activation, Conv2D
+from keras.layers.convolutional import MaxPooling2D
 from keras.models import Sequential
 from keras.optimizers import Adam
 from keras.regularizers import L1L2
 from keras_adversarial import (AdversarialOptimizerSimultaneous, 
                                normal_latent_sampling, simple_gan,
                                gan_targets, AdversarialModel)
-from keras_adversarial.legacy import Dense, l1l2
+from keras_adversarial.legacy import Dense, l1l2, Convolution2D
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.misc import imread
 
-IMAGE_DIM = 32
+IMAGE_DIM = 150 
 
 def get_generator():
     """
@@ -50,9 +51,9 @@ def get_discriminator():
     return model
 
 def main():
-    data_dir = "goldens_32x32/"
+    data_dir = "goldens_filtered_150x150_gray/"
     out_dir = "m_gan_out/"
-    epochs = 1
+    epochs = 25 
     batch_size = 16 
 
     # TODO: Research why these values were chosen
@@ -92,12 +93,10 @@ def main():
     # Side effects
     model.fit(x=train_x, y=gan_targets(train_x.shape[0]), epochs=epochs, batch_size=batch_size)    
     
-    # TODO: Investigate if this is the source of all-white image output
     zsamples = np.random.normal(size=(10, latent_dim))
-    # pred = generator.predict(zsamples).reshape((10, 10, IMAGE_DIM, IMAGE_DIM))
     pred = generator.predict(zsamples)
     for i in range(pred.shape[0]):
-        plt.imshow(pred[i, :])
+        plt.imshow(pred[i, :], cmap="gray")
         plt.savefig(out_dir+str(i)+'.png')
 
 if __name__ == "__main__":
